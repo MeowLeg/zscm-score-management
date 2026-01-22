@@ -1,0 +1,2 @@
+port = 4027
+db_path = "./zscm.db"
