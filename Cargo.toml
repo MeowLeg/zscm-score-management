@@ -24,3 +24,4 @@ toml = "*"
 md5 = "0.7"
 uuid = { version = "1.7.0", features = ["v4", "fast-rng", "macro-diagnostics"] }
 redis = { version = "0.32.4", features = ["tokio-comp"] }
+http = "*"

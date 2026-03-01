@@ -3,7 +3,9 @@ use super::*;
 pub struct GetReporters;
 
 #[derive(Debug, Deserialize)]
-pub struct GetReportersReq {}
+pub struct GetReportersReq {
+    department: Option<String>,
+}
 
 #[derive(Debug, Serialize, FromRow)]
 pub struct Reporter {
@@ -19,19 +21,25 @@ pub struct Reporter {
 impl ExecSql<GetReportersReq> for GetReporters {
     async fn handle_get(
         cfg: Extension<Arc<Config>>,
-        _prms: Option<Query<GetReportersReq>>,
+        prms: Option<Query<GetReportersReq>>,
     ) -> Result<Json<Value>, WebErr> {
+        let Query(prms) = prms.ok_or("Missing parameters")?;
         let mut conn = SqliteConnection::connect(&cfg.db_path).await?;
-        let sql = r#"
-            select
-                r.id, r.name, r.phone, r.reporter_category_id, r.department,
-                rc.name as reporter_category_name, 
-                r.state
-            from reporter r
-            join reporter_category rc on r.reporter_category_id = rc.id
-            where r.state = 1
-        "#;
-        let rows = sqlx::query_as::<Sqlite, Reporter>(sql)
+        let sql = format!(r#"
+                select
+                    r.id, r.name, r.phone, r.reporter_category_id, r.department,
+                    rc.name as reporter_category_name, 
+                    r.state
+                from reporter r
+                join reporter_category rc on r.reporter_category_id = rc.id
+                where r.state = 1 {}
+            "#,
+            match prms.department {
+                Some(department) => format!("and r.department = '{}'", department),
+                None => "".to_string(),
+            }
+        );
+        let rows = sqlx::query_as::<Sqlite, Reporter>(&sql)
             .fetch_all(&mut conn)
             .await?;
         Ok(Json(json!({

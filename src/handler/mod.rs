@@ -50,6 +50,24 @@ pub trait ExecSql<T> {
     ) -> Result<Json<Value>, WebErr> {
         Ok(Json(json!({})))
     }
+
+    async fn handle_get_with_headers(
+        _headers: http::HeaderMap,
+        _cfg_info: Extension<Arc<Config>>,
+        _params: Option<Query<T>>
+    ) -> Result<Json<Value>, WebErr> {
+        Ok(Json(json!({})))
+    }
+
+    async fn handle_get_with_headers_and_redis_cli(
+        _headers: http::HeaderMap,
+        _cfg_info: Extension<Arc<Config>>,
+        _redis_cli: Extension<Arc<Client>>,
+        _params: Option<Query<T>>
+    ) -> Result<Json<Value>, WebErr> {
+        Ok(Json(json!({})))
+    }
+
 }
 
 #[derive(Debug)]

@@ -19,6 +19,7 @@ pub struct ArticleRequest {
     ref_id: u32,
     duration: u32,
     character_count: u32,
+    is_collaboration: Option<u8>,
 }
 
 impl ExecSql<ArticleRequest> for Article {
@@ -27,8 +28,9 @@ impl ExecSql<ArticleRequest> for Article {
         prms: Result<Json<ArticleRequest>, JsonRejection>,
     ) -> Result<Json<Value>, WebErr> {
         let Json(prms) = prms?;
-        println!("ArticleRequest: {:?}", &prms);
+        // println!("ArticleRequest: {:?}", &prms);
         let mut conn = SqliteConnection::connect(&cfg.db_path).await?;
+        let is_collaboration = prms.is_collaboration.unwrap_or(0);
         match prms.id {
             Some(id) => {
                 if prms.state == 0 {
@@ -49,7 +51,7 @@ impl ExecSql<ArticleRequest> for Article {
                             publish_month=?, publish_day=?, tv_url=?, page_meta_id=?,
                             content=?, html_content=?, page_name=?,
                             ref_id=?, duration=?, character_count=?,
-                            state=?
+                            state=?, is_collaboration=?
                         where id=?
                     "#;
                     let r = sqlx::query(sql)
@@ -67,6 +69,7 @@ impl ExecSql<ArticleRequest> for Article {
                         .bind(&prms.duration)
                         .bind(&prms.character_count)
                         .bind(prms.state)
+                        .bind(is_collaboration)
                         .bind(id)
                         .execute(&mut conn)
                         .await?;
@@ -83,8 +86,9 @@ impl ExecSql<ArticleRequest> for Article {
                     insert into article(
                         title, tv_or_paper, publish_year, publish_month,
                         publish_day, tv_url, page_meta_id, page_name,
-                        content, html_content, state, ref_id, duration, character_count)
-                    values(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                        content, html_content, state, ref_id, duration,
+                        character_count, is_collaboration)
+                    values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 "#;
                 match sqlx::query(sql)
                     .bind(&prms.title)
@@ -101,6 +105,7 @@ impl ExecSql<ArticleRequest> for Article {
                     .bind(prms.ref_id)
                     .bind(prms.duration)
                     .bind(prms.character_count)
+                    .bind(is_collaboration)
                     .execute(&mut conn)
                     .await
                 {

@@ -14,6 +14,7 @@ pub struct ArticleRequest {
     page_meta_id: u8,
     page_name: String,
     state: u8,
+    is_collaboration: Option<u8>,
     // content: String,
     // html_content: String,
     // ref_id: u32,
@@ -29,6 +30,7 @@ impl ExecSql<ArticleRequest> for Article {
         let Json(prms) = prms?;
         println!("ArticleRequest: {:?}", &prms);
         let mut conn = SqliteConnection::connect(&cfg.db_path).await?;
+        let is_collaboration = prms.is_collaboration.unwrap_or(0);
         match prms.id {
             Some(id) => {
                 if prms.state == 0 {
@@ -47,7 +49,7 @@ impl ExecSql<ArticleRequest> for Article {
                     let sql = r#"
                         update article set title=?, tv_or_paper=?, publish_year=?,
                             publish_month=?, publish_day=?, tv_url=?, page_meta_id=?,
-                            page_name=?, state=?
+                            page_name=?, state=?, is_collaboration=?
                         where id=?
                     "#;
                     let r = sqlx::query(sql)
@@ -60,6 +62,7 @@ impl ExecSql<ArticleRequest> for Article {
                         .bind(prms.page_meta_id)
                         .bind(&prms.page_name)
                         .bind(prms.state)
+                        .bind(is_collaboration)
                         .bind(id)
                         .execute(&mut conn)
                         .await?;
@@ -75,8 +78,8 @@ impl ExecSql<ArticleRequest> for Article {
                 let sql = r#"
                     insert into article(
                         title, tv_or_paper, publish_year, publish_month,
-                        publish_day, tv_url, page_meta_id, page_name, state)
-                    values(?,?,?,?,?,?,?,?,?)
+                        publish_day, tv_url, page_meta_id, page_name, state, is_collaboration)
+                    values(?,?,?,?,?,?,?,?,?,?)
                 "#;
                 match sqlx::query(sql)
                     .bind(&prms.title)
@@ -88,6 +91,7 @@ impl ExecSql<ArticleRequest> for Article {
                     .bind(prms.page_meta_id)
                     .bind(&prms.page_name)
                     .bind(prms.state)
+                    .bind(is_collaboration)
                     .execute(&mut conn)
                     .await
                 {

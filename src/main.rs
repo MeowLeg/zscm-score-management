@@ -107,7 +107,7 @@ async fn main() -> Result<()> {
             "/get_monthly_sub_score",
             get(get_monthly_sub_score::GetMonthlySubScore::handle_get),
         )
-        .route("/get_programs", get(get_programs::GetPrograms::handle_get))
+        .route("/get_programs", get(get_programs::GetPrograms::handle_get_with_headers))
         // calc
         .route("/calc_monthly", get(calc_monthly::CalcMonthly::handle_get))
         .route_layer(
@@ -116,7 +116,8 @@ async fn main() -> Result<()> {
                 auth_account
             )
         )
-        .route("/get_articles", get(get_articles::GetArticles::handle_get))
+        .route("/score_for_dump", post(score::Score::handle_post))
+        .route("/get_articles", get(get_articles::GetArticles::handle_get_with_headers))
         .route("/article_from_dump", post(article_from_dump::Article::handle_post))
         .route("/batch_update_tv_urls", post(batch_update_tv_urls::BatchUpdateTvUrls::handle_post))
         .route("/login", post(login::Login::handle_post_with_redis_cli))

@@ -25,6 +25,7 @@ impl ExecSql<ScoreRequest> for Score {
         prms: Result<Json<ScoreRequest>, JsonRejection>,
     ) -> Result<Json<Value>, WebErr> {
         let Json(prms) = prms?;
+        println!("param: {:?}", &prms);
         let mut conn = SqliteConnection::connect(&cfg.db_path).await?;
         let del_sql = format!(
             "DELETE FROM article_reporter_score WHERE article_id = {}",
@@ -50,6 +51,7 @@ impl ExecSql<ScoreRequest> for Score {
             println!("{:?}", &reporter_score);
             match reporter_score.reporter_id {
                 Some(r_id) => {
+                    println!("reporter_id: {:?}", &r_id);
                     let _ = sqlx::query(&insert_sql)
                         .bind(prms.article_id)
                         .bind(r_id)
@@ -60,13 +62,15 @@ impl ExecSql<ScoreRequest> for Score {
                 }
                 None => match reporter_score.ref_code {
                     Some(code) => {
+                        println!("ref_code: {:?}", &code);
                         let s_sql = "select id from reporter where ref_code = ?";
                         match sqlx::query_as::<Sqlite, (u32,)>(&s_sql)
-                            .bind(code)
+                            .bind(&code)
                             .fetch_one(&mut conn)
                             .await
                         {
                             Ok(r_id) => {
+                                println!("ref_code: {:?}, reporter_id: {:?}", &code, &r_id.0);
                                 let _ = sqlx::query(&insert_sql)
                                     .bind(prms.article_id)
                                     .bind(r_id.0)
@@ -76,15 +80,20 @@ impl ExecSql<ScoreRequest> for Score {
                                     .await?;
                             }
                             Err(e) => {
+                                println!("can not find reporter_id by ref_code: {:?}", &code);
                                 println!("Error fetching reporter ID: {}", e);
                             }
                         };
                     }
                     None => match reporter_score.reporter_name {
                         Some(name) => {
-                            let s_sql = "select id from reporter where name = ?";
+                            let s_sql = if reporter_score.reporter_category_id == 7 {
+                                "select id from reporter where name = ? and reporter_category_id = 7"
+                            } else {
+                                "select id from reporter where name = ? and reporter_category_id != 7"
+                            }; 
                             match sqlx::query_as::<Sqlite, (u32,)>(&s_sql)
-                                .bind(name)
+                                .bind(&name)
                                 .fetch_one(&mut conn)
                                 .await
                             {
@@ -98,7 +107,30 @@ impl ExecSql<ScoreRequest> for Score {
                                         .await?;
                                 }
                                 Err(e) => {
-                                    println!("Error fetching reporter ID: {}", e);
+                                    // 通讯员
+                                    // 通讯员仅仅靠名字来处理，因此存在同名的情况，但是因为是月结，只要再一个月内不存在同名的人就没有问题
+                                    if reporter_score.reporter_category_id == 7 {
+                                        let i_sql = "insert into reporter (name, phone, ref_code, department, reporter_category_id, state) values (?, ?, ?, ?, ?, ?)";
+                                        let r = sqlx::query(&i_sql)
+                                            .bind(&name)
+                                            .bind("")
+                                            .bind("")
+                                            .bind("外部")
+                                            .bind(reporter_score.reporter_category_id)
+                                            .bind(1)
+                                            .execute(&mut conn)
+                                            .await?;
+                                        let r_id = r.last_insert_rowid();
+                                        let _ = sqlx::query(&insert_sql)
+                                            .bind(prms.article_id)
+                                            .bind(r_id)
+                                            .bind(reporter_score.reporter_category_id)
+                                            .bind(reporter_score.score)
+                                            .execute(&mut conn)
+                                            .await?;
+                                    } else {
+                                        println!("Error fetching reporter ID: {}", e);
+                                    }
                                 }
                             }
                         }

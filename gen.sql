@@ -22,6 +22,7 @@ create table
         -- 分数
         score_basic integer not null default 0,
         score_action integer not null default 0,
+        is_collaboration integer not null default 0, -- 0: 非通讯员稿件; 1: 通讯员稿件
         state integer not null default 1
     );
 
@@ -30,13 +31,14 @@ create table if not exists program (
     name text notn null default '',
     media_type integer not null default 0, -- 0: 电视; 1: 报纸
     site_id integer not null default 0, -- 0: 舟山新闻; 1: 舟山日报
+    parent_id integer, -- 根节点
     code text not null default '',
     state integer not null default 1
 );
-insert into program (name, media_type, site_id, code)
-values
-    ('舟山新闻', 0, 0, '590f6b165afa45f1bd8fc1ed31756fb7'),
-    ('舟山日报', 1, 1, '');
+-- insert into program (name, media_type, site_id, code)
+-- values
+--     ('舟山新闻', 0, 0, '590f6b165afa45f1bd8fc1ed31756fb7'),
+--     ('舟山日报', 1, 1, '');
 
 -- insert into article (title, tv_or_paper, publish_year, publish_month, publish_day, tv_url, page_meta_id, page_name, score_basic, score_action, state)
 -- values
@@ -86,6 +88,17 @@ create table
         department text not null default '',
         state integer not null default 1
     );
+
+-- -- 通讯员 该表是否需要存在，还需要观察
+-- create table
+--     if not exists collaborator (
+--         id integer primary key autoincrement,
+--         name text not null,
+--         phone text not null default '',
+--         ref_code text unque,
+--         department text not null default '',
+--         state integer not null default 1
+--     );
 
 create table
     if not exists reporter_category (
@@ -161,6 +174,17 @@ create table
         name text not null,
         password text not null
     );
+
+create table 
+    if not exists admin_sites (
+        id integer primary key autoincrement,
+        admin_id integer not null default 0,
+        site_id integer not null default 0 -- 0: 舟山新闻; 1: 舟山日报
+    );
+
+insert into admin_sites (admin_id, site_id) values (4, 0);
+
+
 
 -- insert into
 --     admin (name, password)

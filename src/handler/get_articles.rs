@@ -13,6 +13,7 @@ pub struct GetArticlesReq {
     pub keyword: Option<String>,
     pub reporter_id: Option<u32>,
     pub tv_url: Option<String>,
+    pub is_collaboration: Option<u32>,
 }
 
 #[derive(Debug, Serialize, FromRow)]
@@ -36,6 +37,7 @@ pub struct Article {
     pub title: String,
     pub tv_or_paper: u8,
     pub media_type: u8,
+    pub program_name: String,
     pub publish_year: u32,
     pub publish_month: u32,
     pub publish_day: u32,
@@ -60,6 +62,7 @@ pub struct ArticleRow {
     pub title: String,
     pub tv_or_paper: u8,
     pub media_type: u8,
+    pub program_name: String,
     pub publish_year: u32,
     pub publish_month: u32,
     pub publish_day: u32,
@@ -77,10 +80,18 @@ pub struct ArticleRow {
 }
 
 impl ExecSql<GetArticlesReq> for GetArticles {
-    async fn handle_get(
+    async fn handle_get_with_headers(
+        headers: http::HeaderMap,
         cfg: Extension<Arc<Config>>,
         prms: Option<Query<GetArticlesReq>>,
     ) -> Result<Json<Value>, WebErr> {
+        let account = match headers.get("account") {
+            Some(ant) => ant.to_str()?,
+            None => ""
+        };
+        if account.is_empty() {
+            return Err("no account".into());
+        }
         let prms = prms.ok_or("Missing parameters")?;
         let mut conn = SqliteConnection::connect(&cfg.db_path).await?;
         let sql = format!(
@@ -91,7 +102,8 @@ impl ExecSql<GetArticlesReq> for GetArticles {
                 a.content,
                 a.html_content,
                 a.tv_or_paper,
-                program.media_type,
+                p.media_type,
+                p.name as program_name,
                 a.publish_year,
                 a.publish_month,
                 a.publish_day,
@@ -104,15 +116,17 @@ impl ExecSql<GetArticlesReq> for GetArticles {
                 a.ref_id,
                 a.duration,
                 a.character_count
-            from article a {}
-                left join program on a.tv_or_paper = program.site_id
+            from program p, article a {}
                 left join page_meta pm on a.page_meta_id = pm.id
                 where
+                {}
                 {}
                 {}
                 a.state = 1
                 and a.publish_year = ?
                 and a.publish_month = ?
+                and a.tv_or_paper = p.site_id
+                and p.state = 1
                 {}
                 {}
                 {}
@@ -130,6 +144,16 @@ impl ExecSql<GetArticlesReq> for GetArticles {
                 ),
                 None => String::new(),
             },
+            match prms.is_collaboration {
+                Some(is_collaboration) => {
+                    if is_collaboration == 1 {
+                        String::from("a.is_collaboration = 1 and")
+                    } else {
+                        String::new()
+                    }
+                },
+                None => String::new(),
+            },
             match prms.tv_or_paper.clone() {
                 Some(tv_or_paper) => {
                     match tv_or_paper.parse::<i32>() {
@@ -143,7 +167,9 @@ impl ExecSql<GetArticlesReq> for GetArticles {
                         Err(_) => format!("a.tv_or_paper in ({}) and ", tv_or_paper),
                     }
                 },
-                None => String::new(),
+                None => {
+                    format!("a.tv_or_paper in (select site_id from admin_sites where admin_id in (select id from admin where name = '{}')) and ", account)
+                }
             },
             match prms.day {
                 Some(day) => format!("and a.publish_day = {}", day),
@@ -245,6 +271,7 @@ impl ExecSql<GetArticlesReq> for GetArticles {
                     publish_day: row.publish_day,
                     tv_url: row.tv_url,
                     media_type: row.media_type,
+                    program_name: row.program_name,
                     paper_url: row.paper_url,
                     page_meta_id: row.page_meta_id,
                     page_name: row.page_name,
@@ -263,11 +290,14 @@ impl ExecSql<GetArticlesReq> for GetArticles {
         let sql = format!(
             r#"
                 select count(a.id)
-                from article a
+                from article a, program p
                     {}
                     a.state = 1
+                    {}
                     and a.publish_year = ?
                     and a.publish_month = ?
+                    and a.tv_or_paper = p.site_id
+                    and p.state = 1
                     {}
                     {}
             "#,
@@ -278,13 +308,25 @@ impl ExecSql<GetArticlesReq> for GetArticles {
                 ),
                 None => String::from("where "),
             },
+            match prms.is_collaboration {
+                Some(is_collaboration) => {
+                    if is_collaboration == 1 {
+                        String::from("and a.is_collaboration = 1")
+                    } else {
+                        String::new()
+                    }
+                },
+                None => String::new(),
+            },
             match &prms.keyword {
                 Some(keyword) => format!("and a.title like '%{}%'", keyword),
                 None => String::new(),
             },
             match prms.tv_or_paper.clone() {
                 Some(tv_or_paper) => format!("and a.tv_or_paper in ({})", tv_or_paper),
-                None => String::new(),
+                None => {
+                    format!("and a.tv_or_paper in (select site_id from admin_sites where admin_id in (select id from admin where name = '{}'))", account)
+                }
             },
         );
         let count = sqlx::query_scalar::<Sqlite, i64>(&sql)
