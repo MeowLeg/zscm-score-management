@@ -7,6 +7,7 @@ pub struct CalcMonthlyReq {
     pub year: u32,
     pub month: u32,
     pub reporter_id: Option<u32>, // 添加记者ID参数，可选
+    pub department: Option<String>, // 添加部门参数，可选
 }
 
 #[derive(Debug, Serialize, FromRow)]
@@ -118,6 +119,11 @@ impl ExecSql<CalcMonthlyReq> for CalcMonthly {
             Some(_) => format!("{} AND r.id = ?", sql),
             None => String::from(sql),
         };
+
+        let sql = match prms.department {
+            Some(_) => format!("{} AND r.department = ?", sql),
+            None => String::from(sql),
+        };
         
         // 执行查询并绑定参数
         let mut query = sqlx::query_as::<Sqlite, CalcMonthlyResp>(&sql);
@@ -130,6 +136,11 @@ impl ExecSql<CalcMonthlyReq> for CalcMonthly {
         // 如果提供了记者ID，添加到参数列表
         let query = match prms.reporter_id {
             Some(reporter_id) => query.bind(reporter_id),
+            None => query,
+        };
+
+        let query = match prms.department {
+            Some(ref dept) => query.bind(dept),
             None => query,
         };
         

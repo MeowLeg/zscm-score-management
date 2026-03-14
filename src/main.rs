@@ -118,6 +118,7 @@ async fn main() -> Result<()> {
         )
         .route("/score_for_dump", post(score::Score::handle_post))
         .route("/get_articles", get(get_articles::GetArticles::handle_get_with_headers))
+        .route("/get_reporter_info_by_name", get(get_reporter_info_by_name::GetReporterInfoByName::handle_get))
         .route("/article_from_dump", post(article_from_dump::Article::handle_post))
         .route("/batch_update_tv_urls", post(batch_update_tv_urls::BatchUpdateTvUrls::handle_post))
         .route("/login", post(login::Login::handle_post_with_redis_cli))

@@ -31,7 +31,7 @@ create table if not exists program (
     name text notn null default '',
     media_type integer not null default 0, -- 0: 电视; 1: 报纸
     site_id integer not null default 0, -- 0: 舟山新闻; 1: 舟山日报
-    parent_id integer, -- 根节点
+    order_id integer not null default 0, -- 排序id 越高越靠前
     code text not null default '',
     state integer not null default 1
 );
@@ -172,7 +172,8 @@ create table
     if not exists admin (
         id integer primary key autoincrement,
         name text not null,
-        password text not null
+        password text not null,
+        department text not null default ''
     );
 
 create table 

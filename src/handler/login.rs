@@ -24,6 +24,7 @@ fn get_uuid() -> String {
 pub struct LoginResponse {
     pub id: u32,
     pub name: String,
+    pub department: String,
     // pub password: String,
     #[sqlx(default)]
     pub session_id: String,
@@ -39,7 +40,7 @@ impl ExecSql<LoginReq> for Login {
         let mut conn = SqliteConnection::connect(&cfg.db_path).await?;
         let Json(params) = prms?;
         let sql_sel = r#"
-            select id, name from admin where name = ? and password = ?
+            select id, name, department from admin where name = ? and password = ?
         "#;
         let password_md5 = md5_encrypt(&params.password);
         println!("password_md5: {}", &password_md5);

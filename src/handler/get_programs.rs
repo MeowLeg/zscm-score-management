@@ -12,6 +12,7 @@ pub struct GetProgramsResp {
     name: String,
     media_type: u8,
     site_id: u32,
+    order_id: u32,
     code: String,
     state: u8,
 }
