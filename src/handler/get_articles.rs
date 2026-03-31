@@ -12,6 +12,8 @@ pub struct GetArticlesReq {
     pub tv_or_paper: Option<String>,
     pub keyword: Option<String>,
     pub reporter_id: Option<u32>,
+    pub department: Option<String>,
+    pub reporter_ids: Option<String>,
     pub tv_url: Option<String>,
     pub is_collaboration: Option<u32>,
 }
@@ -116,9 +118,11 @@ impl ExecSql<GetArticlesReq> for GetArticles {
                 a.ref_id,
                 a.duration,
                 a.character_count
-            from program p, article a {}
+            from program p, article a {} {} {}
                 left join page_meta pm on a.page_meta_id = pm.id
                 where
+                {}
+                {}
                 {}
                 {}
                 {}
@@ -130,11 +134,20 @@ impl ExecSql<GetArticlesReq> for GetArticles {
                 {}
                 {}
                 {}
-            order by a.publish_year desc, a.publish_month desc, a.publish_day desc
+            group by a.id
+            order by {} a.publish_year desc, a.publish_month desc, a.publish_day desc
             limit {} offset {}
         "#,
             match prms.reporter_id {
                 Some(_) => String::from(", article_reporter_score ars"),
+                None => String::new(),
+            },
+            match prms.department.clone() {
+                Some(_) => format!(", article_reporter_score ars2"),
+                None => String::new(),
+            },
+            match prms.reporter_ids.clone() {
+                Some(_) => format!(", article_reporter_score ars3"),
                 None => String::new(),
             },
             match prms.reporter_id {
@@ -142,6 +155,14 @@ impl ExecSql<GetArticlesReq> for GetArticles {
                     "a.id = ars.article_id and ars.reporter_id = {} and",
                     reporter_id
                 ),
+                None => String::new(),
+            },
+            match prms.department.clone() {
+                Some(department) => format!("a.id = ars2.article_id and ars2.reporter_id in (select id from reporter where department = '{}') and", department),
+                None => String::new(),
+            },
+            match prms.reporter_ids.clone() {
+                Some(department) => format!("a.id = ars3.article_id and ars3.reporter_id in ({}) and", department),
                 None => String::new(),
             },
             match prms.is_collaboration {
@@ -181,6 +202,10 @@ impl ExecSql<GetArticlesReq> for GetArticles {
             },
             match &prms.tv_url {
                 Some(tv_url) => format!("and a.tv_url = '{}'", tv_url),
+                None => String::new(),
+            },
+            match prms.department.clone() {
+                Some(_) => String::from("ars2.reporter_id,"),
                 None => String::new(),
             },
             prms.limit,
@@ -289,7 +314,7 @@ impl ExecSql<GetArticlesReq> for GetArticles {
 
         let sql = format!(
             r#"
-                select count(a.id)
+                select count(distinct(a.id))
                 from article a, program p
                     {}
                     a.state = 1
@@ -306,7 +331,12 @@ impl ExecSql<GetArticlesReq> for GetArticles {
                     ", article_reporter_score ars where a.id = ars.article_id and ars.reporter_id = {} and",
                     reporter_id
                 ),
-                None => String::from("where "),
+                None => {
+                    match prms.department.clone() {
+                        Some(d) => format!(", article_reporter_score ars2 where a.id = ars2.article_id and ars2.reporter_id in (select id from reporter where department = '{}') and", d),
+                        None => String::from("where "),
+                    }
+                }
             },
             match prms.is_collaboration {
                 Some(is_collaboration) => {
