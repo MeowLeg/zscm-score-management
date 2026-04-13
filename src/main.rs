@@ -124,6 +124,7 @@ async fn main() -> Result<()> {
         .route("/batch_update_tv_urls", post(batch_update_tv_urls::BatchUpdateTvUrls::handle_post))
         .route("/login", post(login::Login::handle_post_with_redis_cli))
         .route("/search_similar_titles", get(search_similar_titles::SearchSimilarTitles::handle_get))
+        .route("/vectorize_titles", get(vectorize_titles::VectorizeTitles::handle_get))
         .layer(Extension(Arc::clone(&cfg)))
         .layer(Extension(Arc::clone(&redis_cli_arc)));
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", cfg.port)).await?;

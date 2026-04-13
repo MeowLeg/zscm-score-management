@@ -2,8 +2,14 @@
 """
 文章标题向量化工具 - zscm.db 版本
 - 从 article 表读取标题（tv_or_paper 不为 0 且不为 2）
-- 使用 scikit-learn 的 TF-IDF 生成向量
+- 使用 TF 向量化
+- 默认只处理增量数据（尚未向量化的标题）
 - 存储到 title_vector 表
+
+使用方法：
+  python vectorize_zscm_titles.py                    # 只处理增量数据
+  python vectorize_zscm_titles.py --force           # 重新向量化所有数据
+  python vectorize_zscm_titles.py --rebuild-vocab   # 重建词汇表并处理增量
 """
 
 import sqlite3
@@ -14,13 +20,13 @@ from typing import List, Optional, Dict
 
 
 class TitleVectorizer:
-    def __init__(self, db_path: str = "./zscm.db"):
+    def __init__(self, db_path: str = "./zscm.db", rebuild_vocab: bool = False):
         self.db_path = db_path
         self.conn = sqlite3.connect(db_path)
         self.conn.row_factory = sqlite3.Row
         self.cursor = self.conn.cursor()
         self.vocab: Dict[str, int] = {}
-        self._load_or_build_vocab()
+        self._load_or_build_vocab(rebuild_vocab)
 
     def _tokenize(self, text: str) -> List[str]:
         """简单的中文分词（按字符和常用词分割）"""
@@ -40,14 +46,19 @@ class TitleVectorizer:
                 i += 1
         return tokens
 
-    def _load_or_build_vocab(self):
+    def _load_or_build_vocab(self, rebuild: bool = False):
         """加载或构建词汇表"""
-        row = self.cursor.execute("SELECT COUNT(*) as cnt FROM vector_vocab").fetchone()
-        if row["cnt"] > 0:
-            rows = self.cursor.execute("SELECT word, idx FROM vector_vocab ORDER BY idx").fetchall()
-            self.vocab = {r["word"]: r["idx"] for r in rows}
-        else:
+        if rebuild:
+            print("正在重建词汇表...")
+            self.cursor.execute("DELETE FROM vector_vocab")
             self._build_vocab()
+        else:
+            row = self.cursor.execute("SELECT COUNT(*) as cnt FROM vector_vocab").fetchone()
+            if row["cnt"] > 0:
+                rows = self.cursor.execute("SELECT word, idx FROM vector_vocab ORDER BY idx").fetchall()
+                self.vocab = {r["word"]: r["idx"] for r in rows}
+            else:
+                self._build_vocab()
 
     def _build_vocab(self):
         """从所有标题构建词汇表"""
@@ -149,10 +160,17 @@ class TitleVectorizer:
 
 
 if __name__ == "__main__":
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='文章标题向量化工具')
+    parser.add_argument('--rebuild-vocab', action='store_true', help='重建词汇表（默认不重建）')
+    parser.add_argument('--force', action='store_true', help='强制重新向量化所有标题（默认只处理增量）')
+    args = parser.parse_args()
+    
     db_path = Path(__file__).resolve().parent.parent / "zscm.db"
-    vectorizer = TitleVectorizer(str(db_path))
+    vectorizer = TitleVectorizer(str(db_path), rebuild_vocab=args.rebuild_vocab)
     
     try:
-        vectorizer.vectorize_all(force=False)
+        vectorizer.vectorize_all(force=args.force)
     finally:
         vectorizer.close()

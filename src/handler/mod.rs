@@ -28,6 +28,7 @@ pub mod batch_update_tv_urls;
 pub mod get_reporter_info_by_name;
 pub mod search_similar_titles;
 pub mod get_paper_abnormal_articles;
+pub mod vectorize_titles;
 
 #[allow(dead_code)]
 pub trait ExecSql<T> {

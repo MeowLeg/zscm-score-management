@@ -211,7 +211,7 @@ impl ExecSql<GetArticlesReq> for GetArticles {
             prms.limit,
             (prms.page - 1) * prms.limit
         );
-        // println!("sql is {}", &sql);
+        println!("sql is {}", &sql);
         let article_rows = sqlx::query_as::<Sqlite, ArticleRow>(&sql)
             .bind(prms.year)
             .bind(prms.month)
