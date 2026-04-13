@@ -110,6 +110,7 @@ async fn main() -> Result<()> {
         .route("/get_programs", get(get_programs::GetPrograms::handle_get_with_headers))
         // calc
         .route("/calc_monthly", get(calc_monthly::CalcMonthly::handle_get))
+        .route("/get_paper_abnormal_articles", get(get_paper_abnormal_articles::GetPaperAbnormalArticles::handle_get_with_headers))
         .route_layer(
             middleware::from_fn_with_state(
                 Arc::clone(&redis_cli_arc),
