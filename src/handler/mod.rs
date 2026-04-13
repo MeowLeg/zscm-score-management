@@ -26,6 +26,7 @@ pub mod get_programs;
 pub mod article;
 pub mod batch_update_tv_urls;
 pub mod get_reporter_info_by_name;
+pub mod search_similar_titles;
 
 #[allow(dead_code)]
 pub trait ExecSql<T> {
