@@ -1,2 +1,4 @@
 port = 4027
 db_path = "./zscm.db"
+newspaper_zsrb_db_path = "./newspaper_zsrb_data.db"
+newspaper_db_path = "./newspaper_data.db"

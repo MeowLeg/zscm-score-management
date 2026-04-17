@@ -1,11 +1,11 @@
 use super::*;
 use std::collections::{HashMap, HashSet};
 
-pub struct SearchSimilarTitles;
+pub struct SearchSimilarContent;
 
 #[derive(Debug, Deserialize)]
-pub struct SearchSimilarTitlesReq {
-    title: String,
+pub struct SearchSimilarContentReq {
+    content: String,
     threshold: Option<f64>,
     limit: Option<i32>,
 }
@@ -17,10 +17,10 @@ pub struct VectorVocab {
 }
 
 #[derive(Debug, Serialize)]
-pub struct SimilarTitle {
+pub struct SimilarContent {
     id: i64,
     article_id: i64,
-    title: String,
+    content: String,
     similarity: f64,
     publication_date: String,
     page_number: Option<i32>,
@@ -30,10 +30,10 @@ pub struct SimilarTitle {
 }
 
 #[derive(Debug, FromRow)]
-struct TitleVectorRow {
+struct ContentVectorRow {
     id: i64,
     article_id: i64,
-    title: String,
+    content: String,
     vector: Vec<u8>,
     publication_date: String,
     page_number: Option<i32>,
@@ -41,25 +41,25 @@ struct TitleVectorRow {
     url: Option<String>,
 }
 
-impl ExecSql<SearchSimilarTitlesReq> for SearchSimilarTitles {
-    async fn handle_get(
+impl ExecSql<SearchSimilarContentReq> for SearchSimilarContent {
+    async fn handle_post(
         cfg: Extension<Arc<Config>>,
-        prms: Option<Query<SearchSimilarTitlesReq>>,
+        prms: Result<Json<SearchSimilarContentReq>, JsonRejection>,
     ) -> Result<Json<Value>, WebErr> {
-        let Query(prms) = prms.ok_or("Missing parameters")?;
+        let Json(prms) = prms?;
         let threshold = prms.threshold.unwrap_or(0.5);
         let limit = prms.limit.unwrap_or(10);
         
         async fn search_db(
             db_path: &str,
-            title: &str,
+            content: &str,
             threshold: f64,
             newspaper_type: String,
-        ) -> Result<Vec<SimilarTitle>, WebErr> {
+        ) -> Result<Vec<SimilarContent>, WebErr> {
             let mut conn = SqliteConnection::connect(db_path).await?;
             
             let vocab_rows = sqlx::query_as::<Sqlite, VectorVocab>(
-                "SELECT word, idx FROM newspaper_vector_vocab ORDER BY idx"
+                "SELECT word, idx FROM newspaper_content_vocab ORDER BY idx"
             )
             .fetch_all(&mut conn)
             .await?;
@@ -70,16 +70,16 @@ impl ExecSql<SearchSimilarTitlesReq> for SearchSimilarTitles {
                 .collect();
             
             let vocab_size = vocab.len();
-            let query_vector = get_embedding(title, &vocab, vocab_size);
+            let query_vector = get_embedding(content, &vocab, vocab_size);
             
-            let vector_rows = sqlx::query_as::<Sqlite, TitleVectorRow>(
+            let vector_rows = sqlx::query_as::<Sqlite, ContentVectorRow>(
                 r#"
                 SELECT 
-                    ntv.id, ntv.article_id, ntv.title, ntv.vector,
+                    ncv.id, ncv.article_id, ncv.content, ncv.vector,
                     ni.publication_date,
                     np.page_number, np.page_info, np.url
-                FROM newspaper_title_vector ntv
-                JOIN newspaper_articles na ON ntv.article_id = na.id
+                FROM newspaper_content_vector ncv
+                JOIN newspaper_articles na ON ncv.article_id = na.id
                 JOIN newspaper_pages np ON na.page_id = np.id
                 JOIN newspaper_issues ni ON np.issue_id = ni.id
                 "#
@@ -95,10 +95,10 @@ impl ExecSql<SearchSimilarTitlesReq> for SearchSimilarTitles {
                 let similarity = cosine_similarity(&query_vector, &stored_vector);
                 
                 if similarity >= threshold {
-                    results.push(SimilarTitle {
+                    results.push(SimilarContent {
                         id: row.id,
                         article_id: row.article_id,
-                        title: row.title,
+                        content: row.content,
                         similarity,
                         publication_date: row.publication_date,
                         page_number: row.page_number,
@@ -113,8 +113,8 @@ impl ExecSql<SearchSimilarTitlesReq> for SearchSimilarTitles {
         }
         
         let (zsrb_results, evening_results) = tokio::join!(
-            search_db(&cfg.newspaper_zsrb_db_path, &prms.title, threshold, "日报".to_string()),
-            search_db(&cfg.newspaper_db_path, &prms.title, threshold, "晚报".to_string())
+            search_db(&cfg.newspaper_zsrb_db_path, &prms.content, threshold, "日报".to_string()),
+            search_db(&cfg.newspaper_db_path, &prms.content, threshold, "晚报".to_string())
         );
         
         let mut results = Vec::new();
@@ -126,7 +126,7 @@ impl ExecSql<SearchSimilarTitlesReq> for SearchSimilarTitles {
         
         Ok(Json(json!({
             "success": true,
-            "errMsg": "相似标题查询成功",
+            "errMsg": "相似内容查询成功",
             "data": results,
         })))
     }

@@ -31,6 +31,8 @@ struct Cli {
 pub struct Config {
     pub port: u32,
     pub db_path: String,
+    pub newspaper_zsrb_db_path: String,
+    pub newspaper_db_path: String,
 }
 
 pub fn read_from_toml(f: &str) -> Result<Config> {
@@ -124,6 +126,7 @@ async fn main() -> Result<()> {
         .route("/batch_update_tv_urls", post(batch_update_tv_urls::BatchUpdateTvUrls::handle_post))
         .route("/login", post(login::Login::handle_post_with_redis_cli))
         .route("/search_similar_titles", get(search_similar_titles::SearchSimilarTitles::handle_get))
+        .route("/search_similar_content", post(search_similar_content::SearchSimilarContent::handle_post))
         .route("/vectorize_titles", get(vectorize_titles::VectorizeTitles::handle_get))
         .layer(Extension(Arc::clone(&cfg)))
         .layer(Extension(Arc::clone(&redis_cli_arc)));
