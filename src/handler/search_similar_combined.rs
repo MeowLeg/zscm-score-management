@@ -36,7 +36,6 @@ pub struct SimilarArticle {
 struct TitleVectorRow {
     id: i64,
     article_id: i64,
-    title: String,
     vector: Vec<u8>,
     publication_date: String,
     page_number: Option<i32>,
@@ -48,7 +47,6 @@ struct TitleVectorRow {
 struct ContentVectorRow {
     id: i64,
     article_id: i64,
-    content: String,
     vector: Vec<u8>,
     publication_date: String,
     page_number: Option<i32>,
@@ -102,7 +100,7 @@ impl ExecSql<SearchSimilarCombinedReq> for SearchSimilarCombined {
             let vector_rows = sqlx::query_as::<Sqlite, TitleVectorRow>(
                 r#"
                 SELECT 
-                    ntv.id, ntv.article_id, ntv.title, ntv.vector,
+                    ntv.id, ntv.article_id, ntv.vector,
                     ni.publication_date,
                     np.page_number, np.page_info, np.url
                 FROM newspaper_title_vector ntv
@@ -114,6 +112,28 @@ impl ExecSql<SearchSimilarCombinedReq> for SearchSimilarCombined {
             .fetch_all(&mut conn)
             .await?;
             
+            let article_ids: Vec<i64> = vector_rows.iter().map(|r| r.article_id).collect();
+            
+            let article_rows: Vec<(i64, String, String)> = if article_ids.is_empty() {
+                Vec::new()
+            } else {
+                let placeholders: String = article_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+                let query = format!(
+                    "SELECT id, title, content FROM newspaper_articles WHERE id IN ({})",
+                    placeholders
+                );
+                let mut q = sqlx::query_as::<Sqlite, (i64, String, String)>(&query);
+                for id in &article_ids {
+                    q = q.bind(id);
+                }
+                q.fetch_all(&mut conn).await?
+            };
+            
+            let article_map: HashMap<i64, (String, String)> = article_rows
+                .into_iter()
+                .map(|(id, title, content)| (id, (title, content)))
+                .collect();
+            
             let mut results = Vec::new();
             
             for row in vector_rows {
@@ -122,11 +142,14 @@ impl ExecSql<SearchSimilarCombinedReq> for SearchSimilarCombined {
                 let similarity = cosine_similarity(&query_vector, &stored_vector);
                 
                 if similarity >= threshold {
+                    let (title, content) = article_map.get(&row.article_id)
+                        .cloned()
+                        .unwrap_or((String::new(), String::new()));
                     results.push(SimilarArticle {
                         id: row.id,
                         article_id: row.article_id,
-                        title: Some(row.title),
-                        content: None,
+                        title: Some(title),
+                        content: Some(content),
                         similarity,
                         match_type: "title".to_string(),
                         publication_date: row.publication_date,
@@ -167,20 +190,42 @@ impl ExecSql<SearchSimilarCombinedReq> for SearchSimilarCombined {
             let vocab_size = vocab.len();
             let query_vector = get_embedding(content, &vocab, vocab_size);
             
-            let vector_rows = sqlx::query_as::<Sqlite, ContentVectorRow>(
+let vector_rows = sqlx::query_as::<Sqlite, ContentVectorRow>(
                 r#"
                 SELECT 
-                    ncv.id, ncv.article_id, ncv.content, ncv.vector,
+                    ncv.id, ncv.article_id, ncv.vector,
                     ni.publication_date,
                     np.page_number, np.page_info, np.url
                 FROM newspaper_content_vector ncv
-                JOIN newspaper_articles na ON ncv.article_id = na.id
+                JOIN newspaper_articles na ON ntv.article_id = na.id
                 JOIN newspaper_pages np ON na.page_id = np.id
                 JOIN newspaper_issues ni ON np.issue_id = ni.id
                 "#
             )
             .fetch_all(&mut conn)
             .await?;
+            
+            let article_ids: Vec<i64> = vector_rows.iter().map(|r| r.article_id).collect();
+            
+            let article_rows: Vec<(i64, String, String)> = if article_ids.is_empty() {
+                Vec::new()
+            } else {
+                let placeholders: String = article_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+                let query = format!(
+                    "SELECT id, title, content FROM newspaper_articles WHERE id IN ({})",
+                    placeholders
+                );
+                let mut q = sqlx::query_as::<Sqlite, (i64, String, String)>(&query);
+                for id in &article_ids {
+                    q = q.bind(id);
+                }
+                q.fetch_all(&mut conn).await?
+            };
+            
+            let article_map: HashMap<i64, (String, String)> = article_rows
+                .into_iter()
+                .map(|(id, title, content)| (id, (title, content)))
+                .collect();
             
             let mut results = Vec::new();
             
@@ -190,11 +235,14 @@ impl ExecSql<SearchSimilarCombinedReq> for SearchSimilarCombined {
                 let similarity = cosine_similarity(&query_vector, &stored_vector);
                 
                 if similarity >= threshold {
+                    let (title, content) = article_map.get(&row.article_id)
+                        .cloned()
+                        .unwrap_or((String::new(), String::new()));
                     results.push(SimilarArticle {
                         id: row.id,
                         article_id: row.article_id,
-                        title: None,
-                        content: Some(row.content),
+                        title: Some(title),
+                        content: Some(content),
                         similarity,
                         match_type: "content".to_string(),
                         publication_date: row.publication_date,
