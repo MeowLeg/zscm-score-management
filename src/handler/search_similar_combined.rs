@@ -197,7 +197,7 @@ let vector_rows = sqlx::query_as::<Sqlite, ContentVectorRow>(
                     ni.publication_date,
                     np.page_number, np.page_info, np.url
                 FROM newspaper_content_vector ncv
-                JOIN newspaper_articles na ON ntv.article_id = na.id
+                JOIN newspaper_articles na ON ncv.article_id = na.id
                 JOIN newspaper_pages np ON na.page_id = np.id
                 JOIN newspaper_issues ni ON np.issue_id = ni.id
                 "#
