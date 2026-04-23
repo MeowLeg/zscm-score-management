@@ -28,6 +28,7 @@ pub mod batch_update_tv_urls;
 pub mod get_reporter_info_by_name;
 pub mod search_similar_titles;
 pub mod search_similar_content;
+pub mod search_similar_combined;
 pub mod get_paper_abnormal_articles;
 pub mod vectorize_titles;
 
